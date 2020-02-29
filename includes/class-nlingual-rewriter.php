@@ -367,11 +367,14 @@ final class Rewriter {
 	 * Attempt to localize the current page URL.
 	 *
 	 * @since 2.9.0 Only use post's translation if neither or both are published.
+	 *              Add checks if SINGLE term/post_type query.
 	 * @since 2.8.9 Unset s in query string when getting search link.
 	 * @since 2.8.4 Dropped use of localize_url() $relocalize param, will always relocalize.
 	 * @since 2.6.0 Fixed paged handling, added check to make sure queried object's post type is supported.
 	 * @since 2.2.0 Now uses get_search_link() to create the search URL.
 	 * @since 2.0.0
+
+	 * @global WP_Query $wp_query The main query object.
 	 *
 	 * @uses Registry::get() to check for backwards compatibility.
 	 * @uses Registry::current_language() to get the current Language object.
@@ -388,6 +391,8 @@ final class Rewriter {
 	 * @return string The localized URL.
 	 */
 	public static function localize_here( $language = null ) {
+		global $wp_query;
+
 		// Ensure $language is a Language, defaulting to current
 		if ( ! validate_language( $language, 'default current' ) ) {
 			// Throw exception if not found
@@ -421,13 +426,16 @@ final class Rewriter {
 			if ( is_front_page() ) {
 				$url = home_url( '/' );
 			}
-			// Term page? Get the term link
-			elseif ( is_tax() || is_tag() || is_category() ) {
-				$url = get_term_link( get_queried_object() );
+			// Single Post type archive? Get the archive link
+			elseif ( is_post_type_archive() && count( (array) $wp_query->query_vars['post_type'] ) == 1 ) {
+				$post_types = (array) $wp_query->query_vars['post_type'];
+				$url = get_post_type_archive_link( $post_types[0] );
 			}
-			// Post type archive? Get the link
-			elseif ( is_post_type_archive() ) {
-				$url = get_post_type_archive_link( get_queried_object()->name );
+			// Single Term page? Get the term link
+			elseif ( ( is_tax() || is_tag() || is_category() )
+			&& count( $wp_query->tax_query->queries ) == 1
+			&& count( $wp_query->tax_query->queries[0]['terms'] ) == 1 ) {
+				$url = get_term_link( get_queried_object() );
 			}
 			// Author archive? Get the link
 			elseif ( is_author() ) {
